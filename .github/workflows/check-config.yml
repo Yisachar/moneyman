@@ -1,0 +1,22 @@
+name: Check config
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check MONEYMAN_CONFIG structure (prints no values)
+        env:
+          MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
+        run: |
+          if [ -z "$MONEYMAN_CONFIG" ]; then echo "RESULT: MONEYMAN_CONFIG is empty"; exit 1; fi
+          if printf '%s' "$MONEYMAN_CONFIG" | grep -q $'\xe2\x80\x9c\|\xe2\x80\x9d'; then echo "RESULT: contains curly quotes (“ ”) instead of straight quotes"; fi
+          if ! printf '%s' "$MONEYMAN_CONFIG" | jq empty 2>/tmp/err; then
+            echo "RESULT: invalid JSON -> $(sed -E 's/[^ ]*: //' /tmp/err | head -1)"
+            exit 1
+          fi
+          echo "RESULT: valid JSON. Structure (types only):"
+          printf '%s' "$MONEYMAN_CONFIG" | jq 'walk(if type=="object" then . elif type=="array" then . else type end) | .accounts |= map(with_entries(.value = (if .key=="companyId" then "set" else .value end)))'
+          printf '%s' "$MONEYMAN_CONFIG" | jq -r '"companyId: " + (.accounts[0].companyId // "missing") , "private key starts ok: " + ((.storage.googleSheets.serviceAccountPrivateKey // "") | startswith("-----BEGIN PRIVATE KEY-----") | tostring), "private key has \\\\n line breaks: " + ((.storage.googleSheets.serviceAccountPrivateKey // "") | contains("\n") | tostring)'
