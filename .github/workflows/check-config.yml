@@ -7,16 +7,19 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - name: Check MONEYMAN_CONFIG structure (prints no values)
         env:
           MONEYMAN_CONFIG: ${{ secrets.MONEYMAN_CONFIG }}
         run: |
           if [ -z "$MONEYMAN_CONFIG" ]; then echo "RESULT: MONEYMAN_CONFIG is empty"; exit 1; fi
           if printf '%s' "$MONEYMAN_CONFIG" | grep -q $'\xe2\x80\x9c\|\xe2\x80\x9d'; then echo "RESULT: contains curly quotes (“ ”) instead of straight quotes"; fi
-          MONEYMAN_CONFIG="$(printf '%s' "$MONEYMAN_CONFIG" | sed -e 's/\xe2\x80\x9c/"/g' -e 's/\xe2\x80\x9d/"/g' -e 's/\xe2\x80\x98/\x27/g' -e 's/\xe2\x80\x99/\x27/g')"
+          MONEYMAN_CONFIG="$(printf '%s' "$MONEYMAN_CONFIG" | python3 .github/scripts/normalize_config.py)"
           echo "(curly quotes are converted automatically)"
           if ! printf '%s' "$MONEYMAN_CONFIG" | jq empty 2>/tmp/err; then
             echo "RESULT: invalid JSON -> $(sed -E 's/[^ ]*: //' /tmp/err | head -1)"
+            echo "RESULT: first 20 characters of line 1 (special characters shown as codes):"
+            printf '%s' "$MONEYMAN_CONFIG" | head -1 | python3 -c "import sys;t=sys.stdin.read()[:20];print(''.join(c if 32<=ord(c)<127 else '<U+%04X>'%ord(c) for c in t))"
             exit 1
           fi
           echo "RESULT: valid JSON. Structure (types only):"

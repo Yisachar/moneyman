@@ -25,6 +25,8 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+
       - id: normalize-repository-name
         run: echo "repository=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
@@ -72,7 +74,7 @@ jobs:
 
       - name: Run scraper
         run: >
-          export MONEYMAN_CONFIG="$(printf '%s' "$MONEYMAN_CONFIG" | sed -e 's/\xe2\x80\x9c/"/g' -e 's/\xe2\x80\x9d/"/g' -e 's/\xe2\x80\x98/\x27/g' -e 's/\xe2\x80\x99/\x27/g')" &&
+          export MONEYMAN_CONFIG="$(printf '%s' "$MONEYMAN_CONFIG" | python3 .github/scripts/normalize_config.py)" &&
           docker run --rm
           -e MONEYMAN_CONFIG
           -e MONEYMAN_CONFIG_SECRET
