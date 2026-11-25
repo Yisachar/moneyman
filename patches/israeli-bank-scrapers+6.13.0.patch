@@ -13,3 +13,62 @@ diff --git a/node_modules/israeli-bank-scrapers/lib/transactions.d.ts b/node_mod
      chargedCurrency?: string;
      description: string;
      memo?: string;
+diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/discount.js b/node_modules/israeli-bank-scrapers/lib/scrapers/discount.js
+--- a/node_modules/israeli-bank-scrapers/lib/scrapers/discount.js
++++ b/node_modules/israeli-bank-scrapers/lib/scrapers/discount.js
+@@ -40,7 +40,16 @@
+ async function fetchAccountData(page, options) {
+   const apiSiteUrl = `${BASE_URL}/Titan/gatewayAPI`;
+   const accountDataUrl = `${apiSiteUrl}/userAccountsData`;
+-  const accountInfo = await (0, _fetch.fetchGetWithinPage)(page, accountDataUrl);
++  let accountInfo = null;
++  try {
++    accountInfo = await (0, _fetch.fetchGetWithinPage)(page, accountDataUrl);
++  } catch (e) {
++    accountInfo = null;
++  }
++  if (!accountInfo || !accountInfo.UserAccountsData) {
++    // Business (SME) sites expose the accounts list on a different endpoint
++    accountInfo = await (0, _fetch.fetchGetWithinPage)(page, `${apiSiteUrl}/userAccounts/bsUserAccountsData`);
++  }
+   if (!accountInfo) {
+     return {
+       success: false,
+@@ -88,7 +97,7 @@
+ }
+ function getPossibleLoginResults() {
+   const urls = {};
+-  urls[_baseScraperWithBrowser.LoginResults.Success] = [`${BASE_URL}/apollo/retail/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail2/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail2/`, `${BASE_URL}/apollo/retail3/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail3/`];
++  urls[_baseScraperWithBrowser.LoginResults.Success] = [`${BASE_URL}/apollo/retail/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail2/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail2/`, `${BASE_URL}/apollo/retail3/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/retail3/`, `${BASE_URL}/apollo/business/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/business/`, `${BASE_URL}/apollo/business2/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/business2/`, `${BASE_URL}/apollo/business3/#/MY_ACCOUNT_HOMEPAGE`, `${BASE_URL}/apollo/business3/`];
+   urls[_baseScraperWithBrowser.LoginResults.InvalidPassword] = [`${BASE_URL}/apollo/core/templates/lobby/masterPage.html#/LOGIN_PAGE`];
+   urls[_baseScraperWithBrowser.LoginResults.ChangePassword] = [`${BASE_URL}/apollo/core/templates/lobby/masterPage.html#/PWD_RENEW`];
+   return urls;
+@@ -100,10 +109,10 @@
+   }, {
+     selector: '#tzPassword',
+     value: credentials.password
+-  }, {
++  }].concat(credentials.num ? [{
+     selector: '#aidnum',
+     value: credentials.num
+-  }];
++  }] : []);
+ }
+ class DiscountScraper extends _baseScraperWithBrowser.BaseScraperWithBrowser {
+   getLoginOptions(credentials) {
+diff --git a/node_modules/israeli-bank-scrapers/lib/scrapers/mercantile.js b/node_modules/israeli-bank-scrapers/lib/scrapers/mercantile.js
+--- a/node_modules/israeli-bank-scrapers/lib/scrapers/mercantile.js
++++ b/node_modules/israeli-bank-scrapers/lib/scrapers/mercantile.js
+@@ -8,9 +8,11 @@
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+ class MercantileScraper extends _discount.default {
+   getLoginOptions(credentials) {
++    // Business accounts log in with ID + password only (no user code)
++    const isBusiness = credentials.business === true || credentials.business === 'true' || !credentials.num;
+     return {
+       ...super.getLoginOptions(credentials),
+-      loginUrl: 'https://start.telebank.co.il/login/?bank=m'
++      loginUrl: isBusiness ? 'https://start.telebank.co.il/login/?bank=m#/LOGIN_PAGE_SME' : 'https://start.telebank.co.il/login/?bank=m'
+     };
+   }
+ }
